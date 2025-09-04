@@ -71,7 +71,7 @@ class Article(models.Model):
 
             self.published_at = timezone.now()
 
-        super.save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse("article_detail", kwargs={"slug": self.slug})
