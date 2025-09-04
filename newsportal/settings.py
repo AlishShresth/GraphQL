@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import datetime
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,9 +39,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Third-party
+    'graphene_django',
+    'django_filters',
+    'corsheaders',
+    
+    # Local
+    'news',
+    'users',
+    'categories',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -120,3 +133,25 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# GrapphQL Configurations
+GRAPHENE = {
+  'SCHEMA': 'newsportal.schema.schema',
+}
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+  "http://localhost:3000"
+]
+
+# JWT Authentication
+JWT_AUTH = {
+  'JWT_VERIFY_EXPIRATION': True,
+  'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
+  'JWT_ALLOW_REFRESH': True,
+  'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=30)
+}
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
