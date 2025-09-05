@@ -140,6 +140,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # GrapphQL Configurations
 GRAPHENE = {
     "SCHEMA": "newsportal.schema.schema",
+    "MIDDLEWARE": [
+        "graphql_jwt.middleware.JSONWebTokenMiddleware",
+    ],
 }
 
 # CORS Configuration

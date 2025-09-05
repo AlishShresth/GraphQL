@@ -453,7 +453,10 @@ class CreateArticle(graphene.Mutation):
         status="draft",
     ):
         # Only journalists and editors can create articles
-        if not info.context.user.is_authenticated or not (
+        if not info.context.user.is_authenticated:
+            raise Exception("You must be logged in to create articles")
+        
+        if not (
             info.context.user.is_journalist or info.context.user.is_editor
         ):
             raise Exception("You don't have permission to create articles")
@@ -657,9 +660,9 @@ class Mutation(graphene.ObjectType):
     create_tag = CreateTag.Field()
 
     # Article mutations
-    create_articles = CreateArticle.Field()
-    update_articles = UpdateArticle.Field()
-    delete_articles = DeleteArticle.Field()
+    create_article = CreateArticle.Field()
+    update_article = UpdateArticle.Field()
+    delete_article = DeleteArticle.Field()
 
     # Comment mutations
     create_comment = CreateComment.Field()
