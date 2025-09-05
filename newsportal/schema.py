@@ -1,7 +1,13 @@
+from django.db.models import Q
 import graphene
+import graphql_jwt
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
-from django.db.models import Q
+from graphql_jwt.decorators import (
+    login_required,
+    staff_member_required,
+    superuser_required,
+)
 from users.models import User
 from categories.models import Category
 from news.models import Tag, Article, Comment, Like, Bookmark
@@ -132,8 +138,8 @@ class Query(graphene.ObjectType):
         UserType,
         id=graphene.Int(),
         username=graphene.String(),
-        me=graphene.Field(UserType),
     )
+    me = graphene.Field(UserType)
 
     # Category queries
     categories = DjangoFilterConnectionField(CategoryType)
@@ -410,7 +416,7 @@ class CreateTag(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
 
-    def mutation(self, info, name):
+    def mutate(self, info, name):
         # Only journalists and editors can create tags
         if not info.context.user.is_authenticated or not (
             info.context.user.is_journalist or info.context.user.is_editor
@@ -447,7 +453,10 @@ class CreateArticle(graphene.Mutation):
         status="draft",
     ):
         # Only journalists and editors can create articles
-        if not info.context.user.is_authenticated or not (
+        if not info.context.user.is_authenticated:
+            raise Exception("You must be logged in to create articles")
+        
+        if not (
             info.context.user.is_journalist or info.context.user.is_editor
         ):
             raise Exception("You don't have permission to create articles")
@@ -612,27 +621,28 @@ class LikeArticle(graphene.Mutation):
 
         return LikeArticle(success=True)
 
+
 class BookmarkArticle(graphene.Mutation):
-    success=graphene.Boolean()
-    
+    success = graphene.Boolean()
+
     class Arguments:
         article_id = graphene.ID(required=True)
-    
+
     def mutate(self, info, article_id):
         # Only authenticated users can bookmark articles
         if not info.context.user.is_authenticated:
             raise Exception("You must be logged in to bookmark articles")
-        
+
         article = Article.objects.get(pk=article_id)
         user = info.context.user
-        
+
         bookmark, created = Bookmark.objects.get_or_create(article=article, user=user)
-        
+
         if not created:
             # if bookmark already exists, remove
             bookmark.delete()
             return BookmarkArticle(success=False)
-        
+
         return BookmarkArticle(success=True)
 
 
@@ -640,31 +650,33 @@ class Mutation(graphene.ObjectType):
     # User mutations
     create_user = CreateUser.Field()
     update_user = UpdateUser.Field()
-    
+
     # Category mutations
     create_category = CreateCategory.Field()
     update_category = UpdateCategory.Field()
     delete_category = DeleteCategory.Field()
-    
+
     # Tag mutations
     create_tag = CreateTag.Field()
-    
+
     # Article mutations
-    create_articles = CreateArticle.Field()
-    update_articles = UpdateArticle.Field()
-    delete_articles = DeleteArticle.Field()
-    
+    create_article = CreateArticle.Field()
+    update_article = UpdateArticle.Field()
+    delete_article = DeleteArticle.Field()
+
     # Comment mutations
     create_comment = CreateComment.Field()
     delete_comment = DeleteComment.Field()
-    
+
     # Like and Bookmark mutations
     like_article = LikeArticle.Field()
     bookmark_article = BookmarkArticle.Field()
-    
+
+    # JWT mutations
+    token_auth = graphql_jwt.ObtainJSONWebToken.Field()
+    verify_token = graphql_jwt.Verify.Field()
+    refresh_token = graphql_jwt.Refresh.Field()
+
 
 # Schema
 schema = graphene.Schema(query=Query, mutation=Mutation)
-
-
-
