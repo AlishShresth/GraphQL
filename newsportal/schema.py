@@ -11,6 +11,12 @@ from graphql_jwt.decorators import (
 from users.models import User
 from categories.models import Category
 from news.models import Tag, Article, Comment, Like, Bookmark
+from .decorators import (
+    journalist_required,
+    editor_required,
+    author_required,
+    comment_author_required,
+)
 
 
 class UserType(DjangoObjectType):
@@ -667,62 +673,34 @@ class Mutation(graphene.ObjectType):
         return UpdateUser.mutate(self, info, **kwargs)
 
     # Category mutations
-    @staff_member_required
+    @editor_required
     def resolve_create_category(self, info, **kwargs):
         return CreateCategory.mutate(self, info, **kwargs)
 
-    @staff_member_required
+    @editor_required
     def resolve_update_category(self, info, **kwargs):
         return UpdateCategory.mutate(self, info, **kwargs)
 
-    @staff_member_required
+    @editor_required
     def resolve_delete_category(self, info, **kwargs):
         return DeleteCategory.mutate(self, info, **kwargs)
 
     # Tag mutations
-    @login_required
+    @journalist_required
     def resolve_create_tag(self, info, **kwargs):
-        # Only journalists and editors can create tags
-        user = info.context.user
-        if not (user.is_journalist or user.is_editor):
-            raise Exception("You don't have permission to create tags")
-
         return CreateTag.mutate(self, info, **kwargs)
 
     # Article mutations
-    @login_required
+    @journalist_required
     def resolve_create_article(self, info, **kwargs):
-        # Only journalists and editors can create articles
-        user = info.context.user
-        if not (user.is_journalist or user.is_editor):
-            raise Exception("You don't have permission to create articles")
-
         return CreateArticle.mutate(self, info, **kwargs)
 
-    @login_required
+    @author_required
     def resolve_update_article(self, info, **kwargs):
-        # Only authors can update their own articles and editors can update any article
-        user = info.context.user
-        id = kwargs.get("id")
-
-        if id:
-            article = Article.objects.get(pk=id)
-            if user != article.author and not user.is_editor:
-                raise Exception("You don't have permission to update this article")
-
         return UpdateArticle.mutate(self, info, **kwargs)
 
-    @login_required
+    @author_required
     def resolve_delete_article(self, info, **kwargs):
-        # Only authors can delete their own articles or editors can delete any article
-        user = info.context.user
-        id = kwargs.get("id")
-
-        if id:
-            article = Article.objects.get(pk=id)
-            if user != article.author and not user.is_editor:
-                raise Exception("You don't have permission to delete this article")
-
         return DeleteArticle.mutate(self, info, **kwargs)
 
     # Comment mutations
@@ -730,16 +708,8 @@ class Mutation(graphene.ObjectType):
     def resolve_create_comment(self, info, **kwargs):
         return CreateComment.mutate(self, info, **kwargs)
 
-    @login_required
+    @comment_author_required
     def resolve_delete_comment(self, info, **kwargs):
-        user = info.context.user
-        id = kwargs.get("id")
-
-        if id:
-            comment = Comment.objects.get(pk=id)
-            if user != comment.user and not user.is_editor:
-                raise Exception("You don't have permission to delete this comment")
-
         return DeleteComment.mutate(self, info, **kwargs)
 
     # Like and Bookmark mutations
