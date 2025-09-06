@@ -193,6 +193,7 @@ class Query(graphene.ObjectType):
             return User.objects.get(username=username)
         return None
 
+    @login_required
     def resolve_me(self, info):
         user = info.context.user
         if user.is_authenticated:
@@ -266,6 +267,7 @@ class Query(graphene.ObjectType):
     def resolve_comments_by_article(self, info, article_id):
         return Comment.objects.filter(article_id=article_id, is_approved=True)
 
+    @login_required
     def resolve_user_bookmarks(self, info):
         user = info.context.user
         if user.is_authenticated:
@@ -355,13 +357,8 @@ class CreateCategory(graphene.Mutation):
         description = graphene.String()
         parent_id = graphene.ID()
 
+    @editor_required
     def mutate(self, info, name, description=None, parent_id=None):
-        # Only editors can create categories
-        if not info.context.user.is_authenticated:
-            raise Exception("You must be logged in to create categories")
-        if not info.context.user.is_editor:
-            raise Exception("You don't have permission to create categories")
-
         parent = None
         if parent_id:
             parent = Category.objects.get(pk=parent_id)
@@ -381,11 +378,8 @@ class UpdateCategory(graphene.Mutation):
         description = graphene.String()
         parent_id = graphene.ID()
 
+    @editor_required
     def mutate(self, info, id, name=None, description=None, parent_id=None):
-        # Only editors can update categories
-        if not info.context.user.is_authenticated or not info.context.user.is_editor:
-            raise Exception("You don't have permissions to update categories")
-
         category = Category.objects.get(pk=id)
 
         if name is not None:
@@ -408,11 +402,8 @@ class DeleteCategory(graphene.Mutation):
     class Arguments:
         id = graphene.ID(required=True)
 
+    @editor_required
     def mutate(self, info, id):
-        # Only editors can delete categories
-        if not info.context.user.is_authenticated or not info.context.user.is_editor:
-            raise Exception("You don't have permission to delete categories")
-
         try:
             category = Category.objects.get(pk=id)
             category.delete()
@@ -427,13 +418,8 @@ class CreateTag(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
 
+    @journalist_required
     def mutate(self, info, name):
-        # Only journalists and editors can create tags
-        if not info.context.user.is_authenticated or not (
-            info.context.user.is_journalist or info.context.user.is_editor
-        ):
-            raise Exception("You don't have the permission to create tags")
-
         tag = Tag(name=name)
         tag.save()
 
@@ -452,6 +438,7 @@ class CreateArticle(graphene.Mutation):
         is_featured = graphene.Boolean()
         status = graphene.String()
 
+    @journalist_required
     def mutate(
         self,
         info,
@@ -463,13 +450,6 @@ class CreateArticle(graphene.Mutation):
         is_featured=False,
         status="draft",
     ):
-        # Only journalists and editors can create articles
-        if not info.context.user.is_authenticated:
-            raise Exception("You must be logged in to create articles")
-
-        if not (info.context.user.is_journalist or info.context.user.is_editor):
-            raise Exception("You don't have permission to create articles")
-
         category = Category.objects.get(pk=category_id)
 
         article = Article(
@@ -503,6 +483,7 @@ class UpdateArticle(graphene.Mutation):
         is_featured = graphene.Boolean()
         status = graphene.String()
 
+    @author_required
     def mutate(
         self,
         info,
@@ -515,12 +496,6 @@ class UpdateArticle(graphene.Mutation):
         is_featured=False,
         status=None,
     ):
-        # Only journalists and editors can create articles
-        if not info.context.user.is_authenticated or not (
-            info.context.user.is_journalist or info.context.user.is_editor
-        ):
-            raise Exception("You don't have permission to create articles")
-
         article = Article.objects.get(pk=id)
 
         if title is not None:
@@ -551,14 +526,9 @@ class DeleteArticle(graphene.Mutation):
     class Arguments:
         id = graphene.ID(required=True)
 
+    @author_required
     def mutate(self, info, id):
         article = Article.objects.get(pk=id)
-
-        # Check if the user is the author or an editor
-        if not info.context.user.is_authenticated or (
-            info.context.user != article.author and not info.context.user.is_editor
-        ):
-            raise Exception("You don't have permission to create articles")
 
         article.delete()
         return DeleteArticle(success=True)
@@ -572,11 +542,8 @@ class CreateComment(graphene.Mutation):
         content = graphene.String(required=True)
         parent_id = graphene.ID()
 
+    @login_required
     def mutate(self, info, article_id, content, parent_id=None):
-        # Only authenticated users can create comments
-        if not info.context.user.is_authenticated:
-            raise Exception("You must be logged in to comment")
-
         article = Article.objects.get(pk=article_id)
         parent = None
         if parent_id:
@@ -596,12 +563,9 @@ class DeleteComment(graphene.Mutation):
     class Arguments:
         id = graphene.ID(required=True)
 
+    @comment_author_required
     def mutate(self, info, id):
         comment = Comment.objects.get(pk=id)
-
-        # Check if the user is the comment author or an editor
-        if info.context.user != comment.user and not info.context.user.is_editor:
-            raise Exception("You don't have permission to delete this comment")
 
         comment.delete()
         return DeleteComment(success=True)
@@ -613,11 +577,8 @@ class LikeArticle(graphene.Mutation):
     class Arguments:
         article_id = graphene.ID(required=True)
 
+    @login_required
     def mutate(self, info, article_id):
-        # only authenticated users can like articles
-        if not info.context.user.is_authenticated:
-            raise Exception("You must be logged in to like articles")
-
         article = Article.objects.get(pk=article_id)
         user = info.context.user
 
@@ -637,11 +598,8 @@ class BookmarkArticle(graphene.Mutation):
     class Arguments:
         article_id = graphene.ID(required=True)
 
+    @login_required
     def mutate(self, info, article_id):
-        # Only authenticated users can bookmark articles
-        if not info.context.user.is_authenticated:
-            raise Exception("You must be logged in to bookmark articles")
-
         article = Article.objects.get(pk=article_id)
         user = info.context.user
 
@@ -673,53 +631,25 @@ class Mutation(graphene.ObjectType):
         return UpdateUser.mutate(self, info, **kwargs)
 
     # Category mutations
-    @editor_required
-    def resolve_create_category(self, info, **kwargs):
-        return CreateCategory.mutate(self, info, **kwargs)
-
-    @editor_required
-    def resolve_update_category(self, info, **kwargs):
-        return UpdateCategory.mutate(self, info, **kwargs)
-
-    @editor_required
-    def resolve_delete_category(self, info, **kwargs):
-        return DeleteCategory.mutate(self, info, **kwargs)
+    create_category = CreateCategory.Field()
+    update_category = UpdateCategory.Field()
+    delete_category = DeleteCategory.Field()
 
     # Tag mutations
-    @journalist_required
-    def resolve_create_tag(self, info, **kwargs):
-        return CreateTag.mutate(self, info, **kwargs)
+    create_tag = CreateTag.Field()
 
     # Article mutations
-    @journalist_required
-    def resolve_create_article(self, info, **kwargs):
-        return CreateArticle.mutate(self, info, **kwargs)
-
-    @author_required
-    def resolve_update_article(self, info, **kwargs):
-        return UpdateArticle.mutate(self, info, **kwargs)
-
-    @author_required
-    def resolve_delete_article(self, info, **kwargs):
-        return DeleteArticle.mutate(self, info, **kwargs)
+    create_article = CreateArticle.Field()
+    update_article = UpdateArticle.Field()
+    delete_article = DeleteArticle.Field()
 
     # Comment mutations
-    @login_required
-    def resolve_create_comment(self, info, **kwargs):
-        return CreateComment.mutate(self, info, **kwargs)
-
-    @comment_author_required
-    def resolve_delete_comment(self, info, **kwargs):
-        return DeleteComment.mutate(self, info, **kwargs)
+    create_comment = CreateComment.Field()
+    delete_comment = DeleteComment.Field()
 
     # Like and Bookmark mutations
-    @login_required
-    def resolve_like_article(self, info, **kwargs):
-        return LikeArticle.mutate(self, info, **kwargs)
-
-    @login_required
-    def resolve_bookmark_article(self, info, **kwargs):
-        return BookmarkArticle.mutate(self, info, **kwargs)
+    like_article = LikeArticle.Field()
+    bookmark_article = BookmarkArticle.Field()
 
     # JWT mutations
     token_auth = graphql_jwt.ObtainJSONWebToken.Field()

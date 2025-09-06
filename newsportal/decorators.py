@@ -22,7 +22,7 @@ def journalist_required(func):
 
 
 def editor_required(func):
-    @functools.wrap(func)
+    @functools.wraps(func)
     def wrapper(root, info, **kwargs):
         user = info.context.user
 
@@ -38,7 +38,7 @@ def editor_required(func):
 
 
 def author_required(func):
-    @functools.wrap(func)
+    @functools.wraps(func)
     def wrapper(root, info, **kwargs):
         user = info.context.user
 
@@ -87,6 +87,6 @@ def comment_author_required(func):
             except Comment.DoesNotExist:
                 raise GraphQLError("Comment not found")
 
-            return func(root, info, **kwargs)
+        return func(root, info, **kwargs)
 
-        return wrapper
+    return wrapper
