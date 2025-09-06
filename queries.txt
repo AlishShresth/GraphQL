@@ -359,3 +359,434 @@ query{
     createdAt
   }
 }
+
+Fetch User Profile
+query{
+  user(username: "journalist1"){
+    id
+    username
+    firstName
+    lastName
+    role
+    bio
+    profileImage
+    website
+    twitter
+    facebook
+    instagram
+    dateJoined
+    articles{
+      edges{
+        node{
+          id
+          title
+          slug
+          status
+          publishedAt
+          viewsCount
+          likesCount
+          commentsCount
+        }
+      }
+      
+    }
+  }
+}
+
+Fetch authenticated users data
+query {
+  me {
+    id
+    username
+    email
+    firstName
+    lastName
+    role
+    bio
+    profileImage
+    website
+    twitter
+    facebook
+    instagram
+    dateJoined
+    articles{
+      edges{
+        node{
+          id
+          title
+          slug
+          status
+          publishedAt
+          viewsCount
+          likesCount
+          commentsCount
+        }
+      }
+    }
+    bookmarkedArticles{
+      edges{
+        node{
+          id
+          article {
+            id
+            title
+            slug
+            publishedAt
+          }    
+        }
+      }
+    }
+  }
+}
+
+Search Articles
+query{
+  searchArticles (query: "climate"){
+    id
+    title
+    summary
+    slug
+    publishedAt
+    author{
+      username
+      firstName
+      lastName
+    }
+    category{
+      name
+      slug
+    }
+  }
+}
+
+Mutations
+Create user
+mutation {
+  createUser(
+    username: "newuser",
+    email: "newuser@example.com"
+    password: "testpassword123"
+    firstName:"New"
+    lastName:"User"
+  ) {
+    user{
+      id
+      username
+      email
+      firstName
+      lastName
+      role
+      dateJoined
+    }
+  }
+}
+
+User Login
+mutation{
+  tokenAuth(username:"newuser", password:"testpassword123") {
+    token
+  }
+}
+
+Update User
+mutation {
+  updateUser (
+    id: 12
+    firstName:"Updated"
+    lastName:"User"
+    bio:"I'm a news enthusiast who loves to read and comment on articles."
+    website: "https://example.com"
+    twitter:"updateduser"
+    facebook:"https://facebook.com/updateduser"
+    instagram:"updateduser"
+  ) {
+    user{
+      id
+      username
+      email
+      firstName
+      lastName
+      role
+      bio
+      website
+      twitter
+      facebook
+      instagram
+    }
+  }
+}
+
+Create Category
+mutation{
+  createCategory(
+    name: "Science"
+    description: "Scientific discoveries and research news"
+    parentId: null
+  ) {
+    category {
+      id
+      name
+      slug
+      description
+      parent{
+        id
+        name
+      }
+    }
+  }
+}
+
+Create Subcategory
+mutation{
+  createCategory(
+    name: "Space Exploration",
+    description:"News about space exploration and astronomy",
+    parentId: 19
+  ) {
+    category{
+      id
+      name
+      slug
+      description
+      parent{
+        id
+        name
+      }
+    }
+  }
+}
+
+Update Category 
+mutation{
+  updateCategory(
+    id:19,
+    name: "Science & Research",
+    description:"Scientific discoveries, research news, and academic developments",
+  ) {
+    category{
+      id
+      name
+      slug
+      description
+      parent{
+        id
+        name
+      }
+    }
+  }
+}
+
+Delete Category
+mutation{
+  deleteCategory(
+    id:19
+  ) {
+   success
+  }
+}
+
+Create Tag
+mutation{
+  createTag(name: "Climate Change"){
+    tag{
+      id
+      name
+      slug
+      createdAt
+    }
+  }
+}
+
+Create Article
+mutation{
+  createArticle(
+  title: "New Discovery in Renewable Energy",
+    summary: "Scientists have made a breakthrough in renewable energy technology that could revolutionize the industry.",
+    content: "Scientists at the International Energy Research Institute have announced a major breakthrough in renewable energy technology. The new innovation, which combines advanced solar cells with cutting-edge battery storage, promises to make renewable energy more efficient and affordable than ever before. The technology, which has been in development for over a decade, uses a novel approach to capture and store solar energy, addressing one of the biggest challenges in renewable energy - the intermittent nature of solar power. The research team, led by Dr. Jane Smith, has successfully tested the technology in a pilot project and is now preparing for large-scale implementation. 'This could be a game-changer for the renewable energy industry,' said Dr. Smith in a press conference. 'We're not just improving existing technology; we're reimagining how we harness and store energy from the sun.' The breakthrough comes at a critical time, as countries around the world are looking for ways to reduce their dependence on fossil fuels and meet ambitious climate targets. The new technology is expected to be commercially available within the next two years, and early estimates suggest it could reduce the cost of solar energy by up to 40%. Industry experts are hailing the discovery as a significant step forward in the fight against climate change. 'This is exactly the kind of innovation we need to accelerate the transition to clean energy,' said John Doe, CEO of the Global Renewable Energy Association. 'It demonstrates the incredible potential of human ingenuity to solve our most pressing challenges.' As the world continues to grapple with the effects of climate change, breakthroughs like this offer hope for a more sustainable future. The research team is now working on optimizing the technology for different climates and exploring potential applications in developing countries, where access to affordable energy remains a significant barrier to development.",
+    categoryId: 18,
+    tagIds: [18],
+    isFeatured: false,
+    status: "published"){
+    article {
+      id
+      title
+      summary
+      slug
+      status
+      isFeatured
+      author{
+        id
+        username
+        firstName
+        lastName
+      }
+      category{
+        id
+        name
+        slug
+      }
+      tags{
+        edges{
+          node{
+            id
+            name
+            slug
+          }
+        }
+      }
+      createdAt
+      publishedAt
+    }
+  }
+}
+
+Update Article
+mutation{
+  updateArticle(
+    id:13,
+      title: "Major Breakthrough in Renewable Energy Technology",
+    summary: "Scientists have made a groundbreaking discovery in renewable energy that could transform the industry.",
+    content: "Scientists at the International Energy Research Institute have announced a groundbreaking discovery in renewable energy technology. The new innovation, which combines advanced solar cells with cutting-edge battery storage, promises to make renewable energy more efficient and affordable than ever before. The technology, which has been in development for over a decade, uses a novel approach to capture and store solar energy, addressing one of the biggest challenges in renewable energy - the intermittent nature of solar power. The research team, led by Dr. Jane Smith, has successfully tested the technology in a pilot project and is now preparing for large-scale implementation. 'This could be a game-changer for the renewable energy industry,' said Dr. Smith in a press conference. 'We're not just improving existing technology; we're reimagining how we harness and store energy from the sun.' The breakthrough comes at a critical time, as countries around the world are looking for ways to reduce their dependence on fossil fuels and meet ambitious climate targets. The new technology is expected to be commercially available within the next two years, and early estimates suggest it could reduce the cost of solar energy by up to 40%. Industry experts are hailing the discovery as a significant step forward in the fight against climate change. 'This is exactly the kind of innovation we need to accelerate the transition to clean energy,' said John Doe, CEO of the Global Renewable Energy Association. 'It demonstrates the incredible potential of human ingenuity to solve our most pressing challenges.' As the world continues to grapple with the effects of climate change, breakthroughs like this offer hope for a more sustainable future. The research team is now working on optimizing the technology for different climates and exploring potential applications in developing countries, where access to affordable energy remains a significant barrier to development.",
+    isFeatured: true,
+    status: "published"){
+    article {
+      id
+      title
+      summary
+      slug
+      status
+      isFeatured
+      author{
+        id
+        username
+        firstName
+        lastName
+      }
+      category{
+        id
+        name
+        slug
+      }
+      tags{
+        edges{
+          node{
+            id
+            name
+            slug
+          }
+        }
+      }
+      createdAt
+      publishedAt
+    }
+  }
+}
+
+Delete Article
+mutation {
+  deleteArticle(id: 13) {
+    success
+  }
+}
+
+Create Comment
+mutation {
+  createComment(
+    articleId: 1,
+    content: "This is a very insightful article. I appreciate the detailed analysis of the climate summit outcomes."
+    parentId: null
+  ) {
+    comment {
+      id
+      content
+      createdAt
+      user {
+        id
+        username
+        firstName
+        lastName
+      }
+      article {
+        id
+        title
+        slug
+      }
+      parent {
+        id
+        content
+      }
+    }
+  }
+}
+
+Create Reply to a Comment
+mutation {
+  createComment(
+    articleId: 1,
+    content: "I agree with your assessment. The summit did achieve some important milestones, though there's still much work to be done."
+    parentId: 56
+  ) {
+    comment {
+      id
+      content
+      createdAt
+      user {
+        id
+        username
+        firstName
+        lastName
+      }
+      article {
+        id
+        title
+        slug
+      }
+      parent {
+        id
+        content
+      }
+    }
+  }
+}
+
+Delete Comment
+mutation {
+  deleteComment(
+    id: 25
+  ) {
+    success
+  }
+}
+
+Like Article
+mutation {
+  likeArticle(
+    articleId: 2
+  ) {
+    success
+  }
+}
+
+Bookmark Article
+mutation {
+  bookmarkArticle(
+    articleId: 2
+  ) {
+    success
+  }
+}
+
+Verify Token
+mutation {
+  verifyToken(token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im5ld3VzZXIiLCJleHAiOjE3NTcxNzIxMzEsIm9yaWdJYXQiOjE3NTcxNzE4MzF9.RRkwMhEiJig3StmvmidRSKXxVVSbjzQYaQgjI1qfwUA") {
+    payload
+  }
+}
+
+Refresh Token
+mutation {
+  refreshToken(token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im5ld3VzZXIiLCJleHAiOjE3NTcxNzIxMzEsIm9yaWdJYXQiOjE3NTcxNzE4MzF9.RRkwMhEiJig3StmvmidRSKXxVVSbjzQYaQgjI1qfwUA") {
+    token
+    payload
+  }
+}

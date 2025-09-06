@@ -351,7 +351,9 @@ class CreateCategory(graphene.Mutation):
 
     def mutate(self, info, name, description=None, parent_id=None):
         # Only editors can create categories
-        if not info.context.user.is_authenticated or not info.context.user.is_editor:
+        if not info.context.user.is_authenticated:
+            raise Exception("You must be logged in to create categories")
+        if not info.context.user.is_editor:
             raise Exception("You don't have permission to create categories")
 
         parent = None
