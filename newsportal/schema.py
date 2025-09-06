@@ -652,28 +652,104 @@ class BookmarkArticle(graphene.Mutation):
 class Mutation(graphene.ObjectType):
     # User mutations
     create_user = CreateUser.Field()
-    update_user = UpdateUser.Field()
+
+    @login_required
+    def resolve_update_user(self, info, **kwargs):
+        # Only users can update their own profile or editors can update any profile
+        user = info.context.user
+        id = kwargs.get("id")
+
+        if id:
+            target_user = User.objects.get(pk=id)
+            if user != target_user and not user.is_editor:
+                raise Exception("You don't have permission to update this user")
+
+        return UpdateUser.mutate(self, info, **kwargs)
 
     # Category mutations
-    create_category = CreateCategory.Field()
-    update_category = UpdateCategory.Field()
-    delete_category = DeleteCategory.Field()
+    @staff_member_required
+    def resolve_create_category(self, info, **kwargs):
+        return CreateCategory.mutate(self, info, **kwargs)
+
+    @staff_member_required
+    def resolve_update_category(self, info, **kwargs):
+        return UpdateCategory.mutate(self, info, **kwargs)
+
+    @staff_member_required
+    def resolve_delete_category(self, info, **kwargs):
+        return DeleteCategory.mutate(self, info, **kwargs)
 
     # Tag mutations
-    create_tag = CreateTag.Field()
+    @login_required
+    def resolve_create_tag(self, info, **kwargs):
+        # Only journalists and editors can create tags
+        user = info.context.user
+        if not (user.is_journalist or user.is_editor):
+            raise Exception("You don't have permission to create tags")
+
+        return CreateTag.mutate(self, info, **kwargs)
 
     # Article mutations
-    create_article = CreateArticle.Field()
-    update_article = UpdateArticle.Field()
-    delete_article = DeleteArticle.Field()
+    @login_required
+    def resolve_create_article(self, info, **kwargs):
+        # Only journalists and editors can create articles
+        user = info.context.user
+        if not (user.is_journalist or user.is_editor):
+            raise Exception("You don't have permission to create articles")
+
+        return CreateArticle.mutate(self, info, **kwargs)
+
+    @login_required
+    def resolve_update_article(self, info, **kwargs):
+        # Only authors can update their own articles and editors can update any article
+        user = info.context.user
+        id = kwargs.get("id")
+
+        if id:
+            article = Article.objects.get(pk=id)
+            if user != article.author and not user.is_editor:
+                raise Exception("You don't have permission to update this article")
+
+        return UpdateArticle.mutate(self, info, **kwargs)
+
+    @login_required
+    def resolve_delete_article(self, info, **kwargs):
+        # Only authors can delete their own articles or editors can delete any article
+        user = info.context.user
+        id = kwargs.get("id")
+
+        if id:
+            article = Article.objects.get(pk=id)
+            if user != article.author and not user.is_editor:
+                raise Exception("You don't have permission to delete this article")
+
+        return DeleteArticle.mutate(self, info, **kwargs)
 
     # Comment mutations
-    create_comment = CreateComment.Field()
-    delete_comment = DeleteComment.Field()
+    @login_required
+    def resolve_create_comment(self, info, **kwargs):
+        return CreateComment.mutate(self, info, **kwargs)
+
+    @login_required
+    def resolve_delete_comment(self, info, **kwargs):
+        user = info.context.user
+        id = kwargs.get("id")
+
+        if id:
+            comment = Comment.objects.get(pk=id)
+            if user != comment.user and not user.is_editor:
+                raise Exception("You don't have permission to delete this comment")
+
+        return DeleteComment.mutate(self, info, **kwargs)
 
     # Like and Bookmark mutations
-    like_article = LikeArticle.Field()
-    bookmark_article = BookmarkArticle.Field()
+    @login_required
+    def resolve_like_article(self, info, **kwargs):
+        return LikeArticle.mutate(self, info, **kwargs)
+
+    @login_required
+    def resolve_bookmark_article(self, info, **kwargs):
+        return BookmarkArticle.mutate(self, info, **kwargs)
 
     # JWT mutations
     token_auth = graphql_jwt.ObtainJSONWebToken.Field()
