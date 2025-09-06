@@ -27,6 +27,9 @@ class UserType(DjangoObjectType):
 
 
 class CategoryType(DjangoObjectType):
+    is_subcategory = graphene.Boolean(source="is_subcategory")
+    main_category = graphene.Field(lambda: CategoryType, source="get_main_category")
+
     class Meta:
         model = Category
         fields = "__all__"
@@ -455,10 +458,8 @@ class CreateArticle(graphene.Mutation):
         # Only journalists and editors can create articles
         if not info.context.user.is_authenticated:
             raise Exception("You must be logged in to create articles")
-        
-        if not (
-            info.context.user.is_journalist or info.context.user.is_editor
-        ):
+
+        if not (info.context.user.is_journalist or info.context.user.is_editor):
             raise Exception("You don't have permission to create articles")
 
         category = Category.objects.get(pk=category_id)

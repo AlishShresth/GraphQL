@@ -1,0 +1,361 @@
+Login
+mutation{
+  tokenAuth(username:"testuser", password:"testpassword123") {
+    token
+  }
+}
+
+Fetch all articles
+query{
+  articles{
+    edges {
+      node {
+        id
+        title
+        summary
+        slug
+        status
+        isFeatured
+        viewsCount
+        publishedAt
+        author{
+          id
+          username
+          firstName
+          lastName
+          role
+        }
+        category{
+          id
+          name
+          slug
+        }
+        tags {
+          edges{
+            node{
+              id
+              name
+              slug
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+Fetch article by id
+query {
+  article(id: 1) {
+    id
+    title
+    summary
+    slug
+    status
+    isFeatured
+    viewsCount
+    publishedAt
+    author {
+      id
+      username
+      firstName
+      lastName
+      role
+    }
+    category {
+      id
+      name
+      slug
+    }
+    tags {
+      edges {
+        node {
+          id
+          name
+          slug
+        }
+      }
+    }
+    likesCount
+    commentsCount
+    isLiked
+    isBookmarked
+    comments{
+      edges{
+        node{
+          id
+          content
+          createdAt
+          user{
+            id
+            username
+            firstName
+            lastName
+          }
+        }
+      }
+    }
+  }
+}
+
+Fetch article by slug
+query {
+  article(slug: "global-climate-summit-reaches-historic-agreement") {
+    id
+    title
+    summary
+    slug
+    status
+    isFeatured
+    viewsCount
+    publishedAt
+    author {
+      id
+      username
+      firstName
+      lastName
+      role
+    }
+    category {
+      id
+      name
+      slug
+    }
+    tags {
+      edges {
+        node {
+          id
+          name
+          slug
+        }
+      }
+    }
+    likesCount
+    commentsCount
+    isLiked
+    isBookmarked
+    comments{
+      edges{
+        node{
+          id
+          content
+          createdAt
+          user{
+            id
+            username
+            firstName
+            lastName
+          }
+        }
+      }
+    }
+  }
+}
+
+Fetch articles by category slug
+query{
+  articlesByCategory(categorySlug:"politics"){
+    id
+    title
+    summary
+    slug
+    publishedAt
+    author{
+      username
+      firstName
+      lastName
+    }
+    category {
+      name
+      slug
+    }
+    tags{
+      edges{
+        node{
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+
+Fetch articles by tag slug
+query{
+  articlesByTag(tagSlug:"breaking-news"){
+    id
+    title
+    summary
+    slug
+    publishedAt
+    author{
+      username
+      firstName
+      lastName
+    }
+    category {
+      name
+      slug
+    }
+    tags{
+      edges{
+        node{
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+
+Fetch recent articles
+query{
+  recentArticles(limit:5){
+    id
+    title
+    summary
+    slug
+    publishedAt
+    author{
+      username
+      firstName
+      lastName
+    }
+    category {
+      name
+      slug
+    }
+    viewsCount
+  }
+}
+
+Fetch featured articles 
+query{
+  featuredArticles {
+    id
+    title
+    summary
+    slug
+    featuredImage
+    publishedAt
+    author{
+      username
+      firstName
+      lastName
+    }
+    category {
+      name
+      slug
+    }
+    viewsCount
+    likesCount
+    commentsCount
+  }
+}
+
+Fetch popular articles
+query{
+  popularArticles(limit: 5) {
+    id
+    title
+    summary
+    slug
+    featuredImage
+    publishedAt
+    author{
+      username
+      firstName
+      lastName
+    }
+    category {
+      name
+      slug
+    }
+    viewsCount
+    likesCount
+    commentsCount
+  }
+}
+
+Fetch categories with subcategories
+query{
+  categories {
+    edges{
+      node{
+        id
+        name
+        slug
+        description
+				isSubcategory
+        mainCategory {
+          id
+          name
+        }
+        children {
+          edges{
+            node {
+              id
+              name
+              slug
+              description
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+Fetch comments by article id
+query{
+  commentsByArticle(articleId:2){
+    id
+    content
+    createdAt
+    user{
+      id
+      username
+      firstName
+      lastName
+    }
+    replies{
+      edges{
+        node{
+          id
+          content
+          createdAt
+          user{
+            id
+            username
+            firstName
+            lastName
+          }
+        }
+      }
+    }
+  }
+}
+
+Fetch user bookmarks
+query{
+  userBookmarks {
+    id
+    article{
+    	id
+      title
+      slug
+      summary
+      publishedAt
+      author{
+        username
+        firstName
+        lastName
+      }
+      category{
+        name
+        slug
+      }
+    }
+    createdAt
+  }
+}
