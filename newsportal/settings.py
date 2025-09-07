@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     "graphene_django",
     "django_filters",
     "corsheaders",
+    "channels",
+    "taggit",
     # Local
     "news",
     "users",
@@ -77,7 +79,7 @@ TEMPLATES = [
         },
     },
 ]
-
+ASGI_APPLICATION = 'newsportal.asgi.application'
 WSGI_APPLICATION = "newsportal.wsgi.application"
 
 
@@ -167,3 +169,16 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 AUTH_USER_MODEL = "users.User"
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+# Taggit
+TAGGIT_CASE_INSENSITIVE = True

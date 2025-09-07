@@ -23,7 +23,7 @@ class ArticleAdmin(admin.ModelAdmin):
     list_filter = ("status", "is_featured", "category", "created_at", "published_at")
     search_fields = ("title", "summary" "content")
     prepopulated_fields = {"slug": ("title",)}
-    filter_horizontal = ("tags",)
+    # filter_horizontal = ("tags",)
     date_hierarchy = "published_at"
     ordering = ("-published_at", "-created_at")
 

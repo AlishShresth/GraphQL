@@ -5,9 +5,8 @@ from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql_jwt.decorators import (
     login_required,
-    staff_member_required,
-    superuser_required,
 )
+from graphene_subscriptions import Subscription
 from users.models import User
 from categories.models import Category
 from news.models import Tag, Article, Comment, Like, Bookmark
@@ -105,15 +104,23 @@ class ArticleType(DjangoObjectType):
     class Meta:
         model = Article
         fields = "__all__"
+        exclude_fields = ["search_vector"]
         filter_fields = {
             "id": ["exact"],
             "title": ["exact", "icontains"],
             "slug": ["exact"],
             "status": ["exact"],
             "is_featured": ["exact"],
-            "author": ["exact"],
-            "category": ["exact"],
-            "tags": ["exact"],
+            "author__id": ["exact"],
+            "author__username": ["exact", "icontains"],
+            "category__id": ["exact"],
+            "category__name": ["exact", "icontains"],
+            "category__slug": ["exact"],
+            "tags__id": ["exact"],
+            "tags__name": ["exact", "icontains"],
+            "tags__slug": ["exact"],
+            "published_at": ["exact", "lt", "gt", "lte", "gte"],
+            "created_at": ["exact", "lt", "gt", "lte", "gte"],
         }
         interfaces = (graphene.relay.Node,)
 
@@ -134,6 +141,67 @@ class ArticleType(DjangoObjectType):
         if user.is_authenticated:
             return Bookmark.objects.filter(article=self, user=user).exists()
         return False
+
+
+# Subscription Types
+class ArticleSubscription(Subscription):
+    class Arguments:
+        id = graphene.ID()
+
+    article = graphene.Field(ArticleType)
+
+    def subscribe(self, info, id=None):
+        # Return a list of subscription groups
+        if id:
+            return [f"article_{id}"]
+        return ["all_articles"]
+
+    def publish(self, info, id=None):
+        # called when an event is published
+        article = Article.objects.get(pk=id)
+        return ArticleSubscription(article=article)
+
+
+class CommentSubscription(Subscription):
+    class Arguments:
+        article_id = graphene.ID(required=True)
+
+    comment = graphene.Field(CommentType)
+
+    def subscribe(self, info, article_id=None):
+        # Return a list of subscription groups
+        return [f"comments_article_{article_id}"]
+
+    def publish(self, info, article_id=None):
+        # called when an event is published
+        comment = (
+            Comment.objects.filter(article_id=article_id)
+            .order_by("-created_at")
+            .first()
+        )
+        return CommentSubscription(comment=comment)
+
+
+class BreakingNewsSubscription(Subscription):
+    breaking_news = graphene.Field(ArticleType)
+
+    def subscribe(self, info):
+        # Return a list of subscription groups
+        return ["breaking_news"]
+
+    def publish(self, info):
+        article = (
+            Article.objects.filter(is_featured=True, status="published")
+            .order_by("-published_at")
+            .first()
+        )
+        return BreakingNewsSubscription(breaking_news=article)
+
+
+class Subscription(graphene.ObjectType):
+    article_subscription = ArticleSubscription.Field()
+    comment_subscription = CommentSubscription.Field()
+    breaking_news_subscription = BreakingNewsSubscription.Field()
 
 
 # Query Class
@@ -167,7 +235,30 @@ class Query(graphene.ObjectType):
     )
 
     # Article queries
-    articles = DjangoFilterConnectionField(ArticleType)
+    articles = DjangoFilterConnectionField(
+        ArticleType,
+        first=graphene.Int(),
+        last=graphene.Int(),
+        after=graphene.String(),
+        before=graphene.String(),
+        skip=graphene.Int(),
+        filter=graphene.String(),
+        order_by=graphene.String(),
+    )
+
+    def resolve_articles(
+        self,
+        info,
+        **kwargs,
+    ):
+        # Only return published articles for non-authenticated users and readers
+        user = info.context.user
+        if not user.is_authenticated or user.role == "reader":
+            return Article.objects.filter(status="published")
+
+        # Return all articles for journalists and editors
+        return Article.objects.all()
+
     article = graphene.Field(ArticleType, id=graphene.Int(), slug=graphene.String())
     featured_articles = graphene.List(ArticleType)
     recent_articles = graphene.List(ArticleType, limit=graphene.Int())
@@ -175,6 +266,65 @@ class Query(graphene.ObjectType):
     articles_by_category = graphene.List(ArticleType, category_slug=graphene.String())
     articles_by_tag = graphene.List(ArticleType, tag_slug=graphene.String())
     search_articles = graphene.List(ArticleType, query=graphene.String())
+
+    search_articles_advanced = graphene.List(
+        ArticleType,
+        query=graphene.String(required=True),
+        category_slug=graphene.String(),
+        tag_slug=graphene.String(),
+        author_username=graphene.String(),
+        date_from=graphene.DateTime(),
+        date_to=graphene.DateTime(),
+        limit=graphene.Int(default_value=10),
+    )
+
+    def resolve_search_articles_advanced(
+        self,
+        info,
+        query,
+        category_slug=None,
+        tag_slug=None,
+        author_username=None,
+        date_from=None,
+        date_to=None,
+        limit=10,
+    ):
+        """Advanced search with multiple filters."""
+        if not query:
+            return []
+
+        # Start with full-text search
+        articles = Article.search(query)
+
+        # Apply additional filters
+        if category_slug:
+            try:
+                category = Category.objects.get(slug=category_slug)
+                articles = articles.filter(category=category)
+            except Category.DoesNotExist:
+                return []
+
+        if tag_slug:
+            try:
+                tag = Tag.objects.get(slug=tag_slug)
+                articles = articles.filter(tags=tag)
+            except Tag.DoesNotExist:
+                return []
+
+        if author_username:
+            try:
+                user = User.objects.get(username=author_username)
+                articles = articles.filter(author=user)
+            except User.DoesNotExist:
+                return []
+
+        if date_from:
+            articles = articles.filter(published_at__gte=date_from)
+
+        if date_to:
+            articles = articles.filter(published_at__lte=date_to)
+
+        return articles[:limit]
 
     # Comment queries
     comments = DjangoFilterConnectionField(CommentType)
@@ -467,6 +617,15 @@ class CreateArticle(graphene.Mutation):
             tags = Tag.objects.filter(id__in=tag_ids)
             article.tags.set(tags)
 
+        # trigger subscription event
+        from graphene_subscriptions.events import Event
+
+        Event(type="article_subscription", payload={"id": article.id}).send()
+
+        # if this is a featured article, also trigger breaking news
+        if article.is_featured and article.status == "published":
+            Event(type="breaking_news_subscription", payload={}).send()
+
         return CreateArticle(article=article)
 
 
@@ -517,6 +676,13 @@ class UpdateArticle(graphene.Mutation):
             tags = Tag.objects.filter(id__in=tag_ids)
             article.tags.set(tags)
 
+        from graphene_subscriptions.events import Event
+
+        Event(type="article_subscription", payload={"id": article.id}).send()
+
+        if article.is_featured and article.status == "published":
+            Event(type="breaking_news_subscription", payload={}).send()
+
         return UpdateArticle(article=article)
 
 
@@ -553,6 +719,10 @@ class CreateComment(graphene.Mutation):
             article=article, user=info.context.user, content=content, parent=parent
         )
         comment.save()
+
+        from graphene_subscriptions.events import Event
+
+        Event(type="comment_subscription", payload={"article_id": article_id}).send()
 
         return CreateComment(comment=comment)
 
@@ -658,4 +828,4 @@ class Mutation(graphene.ObjectType):
 
 
 # Schema
-schema = graphene.Schema(query=Query, mutation=Mutation)
+schema = graphene.Schema(query=Query, mutation=Mutation, subscription=Subscription)

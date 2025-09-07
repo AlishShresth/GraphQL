@@ -459,6 +459,71 @@ query{
   }
 }
 
+Fetch Articles with Pagination
+query{
+  articles(first:5, after:"YXJyYXljb25uZWN0aW9uOjEw"){
+    pageInfo{
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    edges{
+      node{
+        id
+        title
+        slug
+        publishedAt
+        author{
+          username
+          firstName
+          lastName
+        }
+        category{
+          name
+          slug
+        }
+        likesCount
+        commentsCount
+      }
+      cursor
+    }
+  }
+}
+
+Full Text Search
+query{
+  searchArticlesAdvanced(
+    query: "climate",
+    categorySlug:"politics",
+    dateFrom: "2023-06-01T00:00:00+00:00",
+    limit:5
+  ) {
+    id
+    title
+    summary
+    slug
+    publishedAt
+    author {
+      username
+      firstName
+      lastName
+    }
+    category {
+      name
+      slug
+    }
+    tags {
+      edges {
+        node {
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+
 Mutations
 Create user
 mutation {

@@ -1,8 +1,11 @@
 from django.db import models
+from django.db.models import Q
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank, SearchVectorField
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.utils.text import slugify
 from django.urls import reverse
+from taggit.managers import TaggableManager
 
 from categories.models import Category
 
@@ -44,7 +47,7 @@ class Article(models.Model):
     category = models.ForeignKey(
         Category, on_delete=models.CASCADE, related_name="articles"
     )
-    tags = models.ManyToManyField(Tag, blank=True, null=True, related_name="articles")
+    tags = TaggableManager(blank=True)
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.DRAFT
     )
@@ -53,11 +56,15 @@ class Article(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     published_at = models.DateTimeField(null=True, blank=True)
+    search_vector = SearchVectorField(null=True)
 
     class Meta:
         ordering = ["-published_at", "-created_at"]
         verbose_name = _("Article")
         verbose_name_plural = _("Articles")
+        indexes = [
+            models.Index(fields=["search_vector"], name="article_search_idx"),
+        ]
 
     def __str__(self):
         return self.title
@@ -83,6 +90,29 @@ class Article(models.Model):
     def increment_views(self):
         self.views_count += 1
         self.save(update_fields=["views_count"])
+
+    @classmethod
+    def search(cls, query):
+        """Perform full-text search on articles.
+        Returns articles ordered by relevance.
+        """
+        if not query:
+            return cls.objects.none()
+
+        search_query = SearchQuery(query)
+        search_vector = (
+            SearchVector("title", weight="A")
+            + SearchVector("summary", weight="B")
+            + SearchVector("content", weight="C")
+        )
+
+        return (
+            cls.objects.annotate(
+                search=search_vector, rank=SearchRank(search_vector, search_query)
+            )
+            .filter(Q(search=search_query) & Q(status="published"))
+            .order_by("-rank", "-published_at")
+        )
 
 
 class Comment(models.Model):
