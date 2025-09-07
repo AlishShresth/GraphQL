@@ -6,6 +6,7 @@ from graphene_django.filter import DjangoFilterConnectionField
 from graphql_jwt.decorators import (
     login_required,
 )
+from graphene_subscriptions import Subscription
 from users.models import User
 from categories.models import Category
 from news.models import Tag, Article, Comment, Like, Bookmark
@@ -140,6 +141,67 @@ class ArticleType(DjangoObjectType):
         if user.is_authenticated:
             return Bookmark.objects.filter(article=self, user=user).exists()
         return False
+
+
+# Subscription Types
+class ArticleSubscription(Subscription):
+    class Arguments:
+        id = graphene.ID()
+
+    article = graphene.Field(ArticleType)
+
+    def subscribe(self, info, id=None):
+        # Return a list of subscription groups
+        if id:
+            return [f"article_{id}"]
+        return ["all_articles"]
+
+    def publish(self, info, id=None):
+        # called when an event is published
+        article = Article.objects.get(pk=id)
+        return ArticleSubscription(article=article)
+
+
+class CommentSubscription(Subscription):
+    class Arguments:
+        article_id = graphene.ID(required=True)
+
+    comment = graphene.Field(CommentType)
+
+    def subscribe(self, info, article_id=None):
+        # Return a list of subscription groups
+        return [f"comments_article_{article_id}"]
+
+    def publish(self, info, article_id=None):
+        # called when an event is published
+        comment = (
+            Comment.objects.filter(article_id=article_id)
+            .order_by("-created_at")
+            .first()
+        )
+        return CommentSubscription(comment=comment)
+
+
+class BreakingNewsSubscription(Subscription):
+    breaking_news = graphene.Field(ArticleType)
+
+    def subscribe(self, info):
+        # Return a list of subscription groups
+        return ["breaking_news"]
+
+    def publish(self, info):
+        article = (
+            Article.objects.filter(is_featured=True, status="published")
+            .order_by("-published_at")
+            .first()
+        )
+        return BreakingNewsSubscription(breaking_news=article)
+
+
+class Subscription(graphene.ObjectType):
+    article_subscription = ArticleSubscription.Field()
+    comment_subscription = CommentSubscription.Field()
+    breaking_news_subscription = BreakingNewsSubscription.Field()
 
 
 # Query Class
@@ -555,6 +617,15 @@ class CreateArticle(graphene.Mutation):
             tags = Tag.objects.filter(id__in=tag_ids)
             article.tags.set(tags)
 
+        # trigger subscription event
+        from graphene_subscriptions.events import Event
+
+        Event(type="article_subscription", payload={"id": article.id}).send()
+
+        # if this is a featured article, also trigger breaking news
+        if article.is_featured and article.status == "published":
+            Event(type="breaking_news_subscription", payload={}).send()
+
         return CreateArticle(article=article)
 
 
@@ -605,6 +676,13 @@ class UpdateArticle(graphene.Mutation):
             tags = Tag.objects.filter(id__in=tag_ids)
             article.tags.set(tags)
 
+        from graphene_subscriptions.events import Event
+
+        Event(type="article_subscription", payload={"id": article.id}).send()
+
+        if article.is_featured and article.status == "published":
+            Event(type="breaking_news_subscription", payload={}).send()
+
         return UpdateArticle(article=article)
 
 
@@ -641,6 +719,10 @@ class CreateComment(graphene.Mutation):
             article=article, user=info.context.user, content=content, parent=parent
         )
         comment.save()
+
+        from graphene_subscriptions.events import Event
+
+        Event(type="comment_subscription", payload={"article_id": article_id}).send()
 
         return CreateComment(comment=comment)
 
@@ -746,4 +828,4 @@ class Mutation(graphene.ObjectType):
 
 
 # Schema
-schema = graphene.Schema(query=Query, mutation=Mutation)
+schema = graphene.Schema(query=Query, mutation=Mutation, subscription=Subscription)

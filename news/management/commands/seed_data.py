@@ -1,10 +1,9 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from categories.models import Category
-from news.models import Tag, Article, Comment, Like, Bookmark
+from news.models import Article, Comment, Like, Bookmark
 from django.utils import timezone
 import random
-
 
 User = get_user_model()
 
@@ -105,10 +104,10 @@ class Command(BaseCommand):
                 name=sub_data["name"], defaults={"parent": parent}
             )
 
-        # create tags
-        self.stdout.write("Creating tags...")
+        # tag pool for taggit
+        self.stdout.write("Preparing tag pool...")
 
-        tag_names = [
+        tag_pool = [
             "Breaking News",
             "Analysis",
             "Opinion",
@@ -127,11 +126,6 @@ class Command(BaseCommand):
             "List",
             "Comparison",
         ]
-
-        tags = []
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tags.append(tag)
 
         # create articles
         self.stdout.write("Creating articles...")
@@ -179,7 +173,6 @@ class Command(BaseCommand):
         for i, article_data in enumerate(article_titles):
             category = Category.objects.get(name=article_data["category"])
             author = random.choice(journalists)
-            article_tags = random.sample(tags, random.randint(2, 5))
 
             article, _ = Article.objects.get_or_create(
                 title=article_data["title"],
@@ -197,35 +190,31 @@ class Command(BaseCommand):
                 },
             )
 
-            # Add tags to article
-            article.tags.set(article_tags)
+            # Assign random tags with taggit
+            random_tags = random.sample(tag_pool, random.randint(2, 5))
+            article.tags.set(random_tags)
+
             articles.append(article)
 
         # create comments
         self.stdout.write("Creating comments...")
 
         for article in articles:
-            # Create 0-5 top-level comments per article
             for _ in range(random.randint(0, 5)):
                 user = random.choice(readers)
-                comment, _ = Comment.objects.get_or_create(
+                comment = Comment.objects.create(
                     article=article,
                     user=user,
-                    defaults={
-                        'content': f'This is a comment on {article.title} by {user.username}.',
-                    }
+                    content=f'This is a comment on {article.title} by {user.username}.',
                 )
-                
-                # Create 0-2 replies to each comment
+
                 for _ in range(random.randint(0, 2)):
                     reply_user = random.choice(readers)
-                    Comment.objects.get_or_create(
+                    Comment.objects.create(
                         article=article,
                         user=reply_user,
                         parent=comment,
-                        defaults={
-                            'content': f'This is a reply to the comment by {user.username} on {article.title}.',
-                        }
+                        content=f'This is a reply to the comment by {user.username} on {article.title}.',
                     )
 
         # create likes and bookmarks
@@ -234,10 +223,10 @@ class Command(BaseCommand):
         for article in articles:
             # random users like the article
             likers = random.sample(readers, random.randint(0, len(readers)))
-            for users in likers:
+            for user in likers:
                 Like.objects.get_or_create(article=article, user=user)
 
-            # Random users bookmark the article
+            # random users bookmark the article
             bookmarkers = random.sample(readers, random.randint(0, len(readers)))
             for user in bookmarkers:
                 Bookmark.objects.get_or_create(article=article, user=user)
