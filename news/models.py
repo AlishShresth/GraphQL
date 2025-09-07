@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.utils.text import slugify
 from django.urls import reverse
+from taggit.managers import TaggableManager
 
 from categories.models import Category
 
@@ -46,7 +47,7 @@ class Article(models.Model):
     category = models.ForeignKey(
         Category, on_delete=models.CASCADE, related_name="articles"
     )
-    tags = models.ManyToManyField(Tag, blank=True, null=True, related_name="articles")
+    tags = TaggableManager(blank=True)
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.DRAFT
     )
