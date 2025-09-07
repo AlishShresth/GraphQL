@@ -5,8 +5,6 @@ from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql_jwt.decorators import (
     login_required,
-    staff_member_required,
-    superuser_required,
 )
 from users.models import User
 from categories.models import Category
@@ -105,15 +103,23 @@ class ArticleType(DjangoObjectType):
     class Meta:
         model = Article
         fields = "__all__"
+        exclude_fields = ["search_vector"]
         filter_fields = {
             "id": ["exact"],
             "title": ["exact", "icontains"],
             "slug": ["exact"],
             "status": ["exact"],
             "is_featured": ["exact"],
-            "author": ["exact"],
-            "category": ["exact"],
-            "tags": ["exact"],
+            "author__id": ["exact"],
+            "author__username": ["exact", "icontains"],
+            "category__id": ["exact"],
+            "category__name": ["exact", "icontains"],
+            "category__slug": ["exact"],
+            "tags__id": ["exact"],
+            "tags__name": ["exact", "icontains"],
+            "tags__slug": ["exact"],
+            "published_at": ["exact", "lt", "gt", "lte", "gte"],
+            "created_at": ["exact", "lt", "gt", "lte", "gte"],
         }
         interfaces = (graphene.relay.Node,)
 
@@ -167,7 +173,30 @@ class Query(graphene.ObjectType):
     )
 
     # Article queries
-    articles = DjangoFilterConnectionField(ArticleType)
+    articles = DjangoFilterConnectionField(
+        ArticleType,
+        first=graphene.Int(),
+        last=graphene.Int(),
+        after=graphene.String(),
+        before=graphene.String(),
+        skip=graphene.Int(),
+        filter=graphene.String(),
+        order_by=graphene.String(),
+    )
+
+    def resolve_articles(
+        self,
+        info,
+        **kwargs,
+    ):
+        # Only return published articles for non-authenticated users and readers
+        user = info.context.user
+        if not user.is_authenticated or user.role == "reader":
+            return Article.objects.filter(status="published")
+
+        # Return all articles for journalists and editors
+        return Article.objects.all()
+
     article = graphene.Field(ArticleType, id=graphene.Int(), slug=graphene.String())
     featured_articles = graphene.List(ArticleType)
     recent_articles = graphene.List(ArticleType, limit=graphene.Int())
@@ -175,6 +204,65 @@ class Query(graphene.ObjectType):
     articles_by_category = graphene.List(ArticleType, category_slug=graphene.String())
     articles_by_tag = graphene.List(ArticleType, tag_slug=graphene.String())
     search_articles = graphene.List(ArticleType, query=graphene.String())
+
+    search_articles_advanced = graphene.List(
+        ArticleType,
+        query=graphene.String(required=True),
+        category_slug=graphene.String(),
+        tag_slug=graphene.String(),
+        author_username=graphene.String(),
+        date_from=graphene.DateTime(),
+        date_to=graphene.DateTime(),
+        limit=graphene.Int(default_value=10),
+    )
+
+    def resolve_search_articles_advanced(
+        self,
+        info,
+        query,
+        category_slug=None,
+        tag_slug=None,
+        author_username=None,
+        date_from=None,
+        date_to=None,
+        limit=10,
+    ):
+        """Advanced search with multiple filters."""
+        if not query:
+            return []
+
+        # Start with full-text search
+        articles = Article.search(query)
+
+        # Apply additional filters
+        if category_slug:
+            try:
+                category = Category.objects.get(slug=category_slug)
+                articles = articles.filter(category=category)
+            except Category.DoesNotExist:
+                return []
+
+        if tag_slug:
+            try:
+                tag = Tag.objects.get(slug=tag_slug)
+                articles = articles.filter(tags=tag)
+            except Tag.DoesNotExist:
+                return []
+
+        if author_username:
+            try:
+                user = User.objects.get(username=author_username)
+                articles = articles.filter(author=user)
+            except User.DoesNotExist:
+                return []
+
+        if date_from:
+            articles = articles.filter(published_at__gte=date_from)
+
+        if date_to:
+            articles = articles.filter(published_at__lte=date_to)
+
+        return articles[:limit]
 
     # Comment queries
     comments = DjangoFilterConnectionField(CommentType)
