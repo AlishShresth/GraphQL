@@ -4,10 +4,10 @@ from graphene.relay.node import from_global_id
 from django.utils import timezone
 from django.db import transaction, IntegrityError
 from taggit.models import Tag
-from news.models import Article, Comment
+from news.models import Article, Bookmark, Comment, Like
 from users.models import User
 from categories.models import Category
-from .types import ArticleType, CategoryType, CommentType, UserType
+from .types import ArticleType, CategoryType, CommentType, TagType, UserType
 
 
 # Permission helpers
@@ -209,6 +209,23 @@ class DeleteCategory(graphene.Mutation):
         return DeleteCategory(success=True)
 
 
+# Tag mutations
+class CreateTag(graphene.Mutation):
+    tag = graphene.Field(TagType)
+
+    class Arguments:
+        name = graphene.String(required=True)
+
+    def mutate(self, info, name):
+        user = require_auth(info)
+        require_role(user, ["journalist", "editor"])
+
+        tag = Tag(name=name)
+        tag.save()
+
+        return CreateTag(tag=tag)
+
+
 # Article mutations
 class CreateArticle(graphene.Mutation):
     article = graphene.Field(ArticleType)
@@ -222,49 +239,49 @@ class CreateArticle(graphene.Mutation):
         status = graphene.String()
         is_featured = graphene.Boolean()
 
-        @transaction.atomic
-        def mutate(
-            self,
-            info,
-            title,
-            summary,
-            content,
-            category_id,
-            tag_ids=None,
-            is_featured=False,
-            status="draft",
-        ):
-            user = require_auth(info)
-            require_role(user, ["journalist", "editor"])
+    @transaction.atomic
+    def mutate(
+        self,
+        info,
+        title,
+        summary,
+        content,
+        category_id,
+        tag_ids=None,
+        is_featured=False,
+        status="draft",
+    ):
+        user = require_auth(info)
+        require_role(user, ["journalist", "editor"])
 
-            type_name, db_id = from_global_id(category_id)
-            if type_name != "CategoryType":
-                raise GraphQLError("Invalid ID type")
-            try:
-                category = Category.objects.get(pk=db_id)
-            except Category.DoesNotExist:
-                raise GraphQLError("Category not found")
-            article = Article.objects.create(
-                title=title,
-                summary=summary,
-                content=content,
-                category=category,
-                author=user,
-                status=status,
-                is_featured=is_featured,
-                published_at=timezone.now() if status == "published" else None,
-            )
-            if tag_ids:
-                tag_db_ids = []
-                for tag in tag_ids:
-                    tag_type, tag_id = from_global_id(tag)
-                    if tag_type != "TagType":
-                        raise GraphQLError("Invalid ID type")
-                    tag_db_ids.append(tag_id)
+        type_name, db_id = from_global_id(category_id)
+        if type_name != "CategoryType":
+            raise GraphQLError("Invalid ID type")
+        try:
+            category = Category.objects.get(pk=db_id)
+        except Category.DoesNotExist:
+            raise GraphQLError("Category not found")
+        article = Article.objects.create(
+            title=title,
+            summary=summary,
+            content=content,
+            category=category,
+            author=user,
+            status=status,
+            is_featured=is_featured,
+            published_at=timezone.now() if status == "published" else None,
+        )
+        if tag_ids:
+            tag_db_ids = []
+            for tag in tag_ids:
+                tag_type, tag_id = from_global_id(tag)
+                if tag_type != "TagType":
+                    raise GraphQLError("Invalid ID type")
+                tag_db_ids.append(tag_id)
 
-                tags = Tag.objects.filter(id__in=tag_db_ids)
-                article.tags.set(tags)
-            return CreateArticle(article=article)
+            tags = Tag.objects.filter(id__in=tag_db_ids)
+            article.tags.set(tags)
+        return CreateArticle(article=article)
 
 
 class UpdateArticle(graphene.Mutation):
@@ -372,21 +389,93 @@ class DeleteArticle(graphene.Mutation):
         return DeleteArticle(success=True)
 
 
+class LikeArticle(graphene.Mutation):
+    success = graphene.Boolean()
+
+    class Arguments:
+        article_id = graphene.ID(required=True)
+
+    def mutate(self, info, article_id):
+        user = require_auth(info)
+
+        type_name, db_id = from_global_id(article_id)
+        if type_name != "ArticleType":
+            raise GraphQLError("Invalid ID type")
+        try:
+            article = Article.objects.get(pk=db_id)
+        except Article.DoesNotExist:
+            raise GraphQLError("Article not found")
+
+        like, created = Like.objects.get_or_create(article=article, user=user)
+
+        if not created:
+            # if like already exists, remove
+            like.delete()
+            return LikeArticle(success=False)
+
+        return LikeArticle(success=True)
+
+
+class BookmarkArticle(graphene.Mutation):
+    success = graphene.Boolean()
+
+    class Arguments:
+        article_id = graphene.ID(required=True)
+
+    def mutate(self, info, article_id):
+        user = require_auth(info)
+
+        type_name, db_id = from_global_id(article_id)
+        if type_name != "ArticleType":
+            raise GraphQLError("Invalid ID type")
+
+        try:
+            article = Article.objects.get(pk=db_id)
+        except Article.DoesNotExist:
+            raise GraphQLError("Article not found")
+
+        bookmark, created = Bookmark.objects.get_or_create(article=article, user=user)
+
+        if not created:
+            # if bookmark already exists, remove
+            bookmark.delete()
+            return BookmarkArticle(success=False)
+
+        return BookmarkArticle(success=True)
+
+
 # Comment mutation
 class AddComment(graphene.Mutation):
     comment = graphene.Field(CommentType)
 
     class Arguments:
         article_id = graphene.ID(required=True)
-        text = graphene.String(required=True)
+        content = graphene.String(required=True)
+        parent_id = graphene.ID()
 
-    def mutate(self, info, article_id, content):
+    def mutate(self, info, article_id, content, parent_id=None):
         user = require_auth(info)
+
+        type_name, db_id = from_global_id(article_id)
+        if type_name != "ArticleType":
+            raise GraphQLError("Invalid ID type")
         try:
-            article = Article.objects.get(pk=article_id)
+            article = Article.objects.get(pk=db_id)
         except Article.DoesNotExist:
             raise GraphQLError("Article not found or not published")
-        comment = Comment.objects.create(article=article, user=user, content=content)
+        parent = None
+        if parent_id:
+            type_name, db_id = from_global_id(parent_id)
+            if type_name != "CommentType":
+                raise GraphQLError("Invalid ID type")
+            try:
+                parent = Comment.objects.get(pk=db_id)
+            except Comment.DoesNotExist:
+                raise GraphQLError("Comment not found")
+
+        comment = Comment(article=article, user=user, content=content, parent=parent)
+
+        comment.save()
 
         # from .subscriptions import comment_broadcast
 
@@ -402,8 +491,12 @@ class DeleteComment(graphene.Mutation):
 
     def mutate(self, info, id):
         user = require_auth(info)
+
+        type_name, db_id = from_global_id(id)
+        if type_name != "CommentType":
+            raise GraphQLError("Invalid ID type")
         try:
-            comment = Comment.objects.get(pk=id)
+            comment = Comment.objects.get(pk=db_id)
         except Comment.DoesNotExist:
             raise GraphQLError("Comment not found")
 
@@ -414,15 +507,23 @@ class DeleteComment(graphene.Mutation):
 
 
 class Mutation(graphene.ObjectType):
+    signup = Signup.Field()
+    update_profile = UpdateProfile.Field()
+
+    create_category = CreateCategory.Field()
+    update_category = UpdateCategory.Field()
+    delete_category = DeleteCategory.Field()
+
+    create_tag = CreateTag.Field()
+
     create_article = CreateArticle.Field()
     update_article = UpdateArticle.Field()
     delete_article = DeleteArticle.Field()
+    like_article = LikeArticle.Field()
+    bookmark_article = BookmarkArticle.Field()
 
     add_comment = AddComment.Field()
     delete_comment = DeleteComment.Field()
-
-    signup = Signup.Field()
-    update_profile = UpdateProfile.Field()
 
     # JWT helpers
     from graphql_jwt.shortcuts import get_token

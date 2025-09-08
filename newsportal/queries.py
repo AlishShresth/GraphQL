@@ -18,6 +18,7 @@ from .types import (
     TagType,
 )
 from users.models import User
+from .search import fulltext_search_articles
 
 
 class Query(graphene.ObjectType):
@@ -55,7 +56,6 @@ class Query(graphene.ObjectType):
         search=graphene.String(),
         category_slug=graphene.String(),
         tag=graphene.String(),
-        status=graphene.String(),
         order_by=graphene.String(),
     )
     article = graphene.Field(ArticleType, id=graphene.ID(), slug=graphene.String())
@@ -64,7 +64,7 @@ class Query(graphene.ObjectType):
     popular_articles = graphene.List(ArticleType, limit=graphene.Int())
     articles_by_category = graphene.List(ArticleType, category_id=graphene.ID())
     articles_by_tag = graphene.List(ArticleType, tag_id=graphene.ID())
-    search_articles = graphene.List(ArticleType, graphene.String(required=True))
+    search_articles = graphene.List(ArticleType, query=graphene.String(required=True))
 
     # Comment queries
     comments = DjangoFilterConnectionField(CommentType)
@@ -128,11 +128,12 @@ class Query(graphene.ObjectType):
             "tags", "comments"
         )
         if search:
-            qs = qs.filter(
-                Q(title__icontains=search)
-                | Q(summary__icontains=search)
-                | Q(content__icontains=search)
-            )
+            try:
+                qs = fulltext_search_articles(search, category_slug)
+            except Exception:
+                qs = qs.filter(
+                    Q(title__icontains=search) | Q(content__icontains=search)
+                )
         if category_slug:
             qs = qs.filter(category__slug=category_slug)
 
