@@ -2,6 +2,7 @@ import graphene
 from django.db.models import Q
 from django.utils import timezone
 from graphql import GraphQLError
+from graphql_relay import from_global_id
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql_jwt.decorators import (
     login_required,
@@ -81,7 +82,7 @@ class Query(graphene.ObjectType):
     # Resolvers
     def resolve_user(self, info, id=None, username=None):
         if id:
-            type_name, db_id = graphene.relay.Node.from_global_id(id)
+            type_name, db_id = from_global_id(id)
             if type_name != "UserType":
                 raise GraphQLError("Invalid ID type")
             return User.objects.get(pk=db_id)
@@ -96,7 +97,7 @@ class Query(graphene.ObjectType):
 
     def resolve_category(self, info, id=None, slug=None):
         if id:
-            type_name, db_id = graphene.relay.Node.from_global_id(id)
+            type_name, db_id = from_global_id(id)
             if type_name != "CategoryType":
                 raise GraphQLError("Invalid ID type")
             return Category.objects.get(pk=db_id)
@@ -106,7 +107,7 @@ class Query(graphene.ObjectType):
 
     def resolve_tag(self, info, id=None, slug=None):
         if id:
-            type_name, db_id = graphene.relay.Node.from_global_id(id)
+            type_name, db_id = from_global_id(id)
             if type_name != "TagType":
                 raise GraphQLError("Invalid ID type")
             return Tag.objects.get(pk=db_id)
@@ -150,7 +151,7 @@ class Query(graphene.ObjectType):
 
     def resolve_article(self, info, id=None, slug=None):
         if id:
-            type_name, db_id = graphene.relay.Node.from_global_id(id)
+            type_name, db_id = from_global_id(id)
             if type_name != "ArticleType":
                 raise GraphQLError("Invalid ID type")
             return (
@@ -180,11 +181,11 @@ class Query(graphene.ObjectType):
         ]
 
     def resolve_articles_by_category(self, info, category_id):
-        db_id = graphene.relay.Node.from_global_id(category_id)[1]
+        db_id = from_global_id(category_id)[1]
         return Article.objects.filter(category_id=db_id, status="published")
 
     def resolve_articles_by_tag(self, info, tag_id):
-        db_id = graphene.relay.Node.from_global_id(tag_id)[1]
+        db_id = from_global_id(tag_id)[1]
         return Article.objects.filter(tags__id=db_id, status="published")
 
     def resolve_search_articles(self, info, query):
@@ -197,12 +198,12 @@ class Query(graphene.ObjectType):
 
     def resolve_comment(self, info, id):
         if id:
-            db_id = graphene.relay.Node.from_global_id(id)[1]
+            db_id = from_global_id(id)[1]
             return Comment.objects.get(pk=db_id)
 
     def resolve_comments_by_article(self, info, article_id):
         if article_id:
-            db_id = graphene.relay.Node.from_global_id(article_id)
+            db_id = from_global_id(article_id)
             return Comment.objects.filter(article_id=db_id, is_approved=True)
 
     @login_required

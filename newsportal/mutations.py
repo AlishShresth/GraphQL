@@ -1,5 +1,6 @@
 import graphene
 from graphql import GraphQLError
+from graphql_relay import from_global_id
 from django.utils import timezone
 from django.db import transaction, IntegrityError
 from news.models import Article, Bookmark, Comment, Like, Tag
@@ -130,7 +131,7 @@ class CreateCategory(graphene.Mutation):
 
         parent = None
         if parent_id:
-            type_name, db_id = graphene.relay.Node.from_global_id(parent_id)
+            type_name, db_id = from_global_id(parent_id)
             if type_name != "CategoryType":
                 raise GraphQLError("Invalid ID type")
             parent = Category.objects.get(pk=db_id)
@@ -154,7 +155,7 @@ class UpdateCategory(graphene.Mutation):
         user = require_auth(info)
         require_role(user, ["editor"])
 
-        type_name, db_id = graphene.relay.Node.from_global_id(id)
+        type_name, db_id = from_global_id(id)
         if type_name != "CategoryType":
             raise GraphQLError("Invalid ID type")
 
@@ -169,7 +170,7 @@ class UpdateCategory(graphene.Mutation):
             category.description = description
 
         if parent_id is not None:
-            type_name, db_id = graphene.relay.Node.from_global_id(parent_id)
+            type_name, db_id = from_global_id(parent_id)
             if type_name != "CategoryType":
                 raise GraphQLError("Invalid ID type")
 
@@ -194,7 +195,7 @@ class DeleteCategory(graphene.Mutation):
         user = require_auth(info)
         require_role(user, ["editor"])
 
-        type_name, db_id = graphene.relay.Node.from_global_id(id)
+        type_name, db_id = from_global_id(id)
         if type_name != "CategoryType":
             raise GraphQLError("Invalid ID type")
 
@@ -252,7 +253,7 @@ class CreateArticle(graphene.Mutation):
         user = require_auth(info)
         require_role(user, ["journalist", "editor"])
 
-        type_name, db_id = graphene.relay.Node.from_global_id(category_id)
+        type_name, db_id = from_global_id(category_id)
         if type_name != "CategoryType":
             raise GraphQLError("Invalid ID type")
         try:
@@ -272,7 +273,7 @@ class CreateArticle(graphene.Mutation):
         if tag_ids:
             tag_db_ids = []
             for tag in tag_ids:
-                tag_type, tag_id = graphene.relay.Node.from_global_id(tag)
+                tag_type, tag_id = from_global_id(tag)
                 if tag_type != "TagType":
                     raise GraphQLError("Invalid ID type")
                 tag_db_ids.append(tag_id)
@@ -308,7 +309,7 @@ class UpdateArticle(graphene.Mutation):
         is_featured=None,
         status=None,
     ):
-        type_name, db_id = graphene.relay.Node.from_global_id(id)
+        type_name, db_id = from_global_id(id)
 
         if type_name != "ArticleType":
             raise GraphQLError("Invalid ID type")
@@ -330,7 +331,7 @@ class UpdateArticle(graphene.Mutation):
             article.content = content
 
         if category_id is not None:
-            c_type, c_id = graphene.relay.Node.from_global_id(category_id)
+            c_type, c_id = from_global_id(category_id)
             if c_type != "CategoryType":
                 raise GraphQLError("Invalid ID type")
             try:
@@ -352,7 +353,7 @@ class UpdateArticle(graphene.Mutation):
         if tag_ids is not None:
             tag_db_ids = []
             for tag in tag_ids:
-                tag_type, tag_id = graphene.relay.Node.from_global_id(tag)
+                tag_type, tag_id = from_global_id(tag)
                 if tag_type != "TagType":
                     raise GraphQLError("Invalid ID type")
                 tag_db_ids.append(tag_id)
@@ -369,7 +370,7 @@ class DeleteArticle(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        type_name, db_id = graphene.relay.Node.from_global_id(id)
+        type_name, db_id = from_global_id(id)
 
         if type_name != "ArticleType":
             raise GraphQLError("Invalid ID type")
@@ -395,7 +396,7 @@ class LikeArticle(graphene.Mutation):
     def mutate(self, info, article_id):
         user = require_auth(info)
 
-        type_name, db_id = graphene.relay.Node.from_global_id(article_id)
+        type_name, db_id = from_global_id(article_id)
         if type_name != "ArticleType":
             raise GraphQLError("Invalid ID type")
         try:
@@ -422,7 +423,7 @@ class BookmarkArticle(graphene.Mutation):
     def mutate(self, info, article_id):
         user = require_auth(info)
 
-        type_name, db_id = graphene.relay.Node.from_global_id(article_id)
+        type_name, db_id = from_global_id(article_id)
         if type_name != "ArticleType":
             raise GraphQLError("Invalid ID type")
 
@@ -453,7 +454,7 @@ class AddComment(graphene.Mutation):
     def mutate(self, info, article_id, content, parent_id=None):
         user = require_auth(info)
 
-        type_name, db_id = graphene.relay.Node.from_global_id(article_id)
+        type_name, db_id = from_global_id(article_id)
         if type_name != "ArticleType":
             raise GraphQLError("Invalid ID type")
         try:
@@ -462,7 +463,7 @@ class AddComment(graphene.Mutation):
             raise GraphQLError("Article not found or not published")
         parent = None
         if parent_id:
-            type_name, db_id = graphene.relay.Node.from_global_id(parent_id)
+            type_name, db_id = from_global_id(parent_id)
             if type_name != "CommentType":
                 raise GraphQLError("Invalid ID type")
             try:
@@ -486,7 +487,7 @@ class DeleteComment(graphene.Mutation):
     def mutate(self, info, id):
         user = require_auth(info)
 
-        type_name, db_id = graphene.relay.Node.from_global_id(id)
+        type_name, db_id = from_global_id(id)
         if type_name != "CommentType":
             raise GraphQLError("Invalid ID type")
         try:
