@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from categories.models import Category
-from news.models import Article, Comment, Like, Bookmark
+from news.models import Article, Comment, Like, Bookmark, Tag
 from django.utils import timezone
 import random
 
@@ -107,25 +107,16 @@ class Command(BaseCommand):
         # tag pool for taggit
         self.stdout.write("Preparing tag pool...")
 
-        tag_pool = [
-            "Breaking News",
-            "Analysis",
-            "Opinion",
-            "Interview",
-            "Investigation",
-            "Trending",
-            "Viral",
-            "Exclusive",
-            "Update",
-            "Report",
-            "Review",
-            "Tutorial",
-            "Guide",
-            "Tips",
-            "How To",
-            "List",
-            "Comparison",
+        tag_names = [
+            'Breaking News', 'Analysis', 'Opinion', 'Interview', 'Investigation',
+            'Trending', 'Viral', 'Exclusive', 'Update', 'Report', 'Review',
+            'Tutorial', 'Guide', 'Tips', 'How To', 'List', 'Comparison'
         ]
+        
+        tags = []
+        for tag_name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name=tag_name)
+            tags.append(tag)
 
         # create articles
         self.stdout.write("Creating articles...")
@@ -173,7 +164,7 @@ class Command(BaseCommand):
         for i, article_data in enumerate(article_titles):
             category = Category.objects.get(name=article_data["category"])
             author = random.choice(journalists)
-
+            article_tags = random.sample(tags, random.randint(2, 5))
             article, _ = Article.objects.get_or_create(
                 title=article_data["title"],
                 defaults={
@@ -190,9 +181,8 @@ class Command(BaseCommand):
                 },
             )
 
-            # Assign random tags with taggit
-            random_tags = random.sample(tag_pool, random.randint(2, 5))
-            article.tags.set(random_tags)
+            # Add tags
+            article.tags.set(article_tags)
 
             articles.append(article)
 

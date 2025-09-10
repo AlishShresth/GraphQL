@@ -104,6 +104,7 @@ class ArticleType(DjangoObjectType):
             "created_at",
             "updated_at",
             "published_at",
+            "comments"
         )
         filter_fields = {
             "id": ["exact"],
@@ -129,7 +130,7 @@ class ArticleType(DjangoObjectType):
     def resolve_comments_count(self, info):
         return self.comments.count()
 
-    def resolve_is_like(self, info):
+    def resolve_is_liked(self, info):
         user = info.context.user
         if user.is_authenticated:
             return Like.objects.filter(article=self, user=user).exists()
