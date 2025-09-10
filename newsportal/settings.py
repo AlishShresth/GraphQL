@@ -44,8 +44,8 @@ INSTALLED_APPS = [
     "graphene_django",
     "django_filters",
     "corsheaders",
-    "channels",
-    "taggit",
+    # "channels",
+    # "graphene_subscriptions",
     # Local
     "news",
     "users",
@@ -171,14 +171,14 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 AUTH_USER_MODEL = "users.User"
 
 # Channels configuration
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
-    },
-}
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [('127.0.0.1', 6379)],
+#         },
+#     },
+# }
 
 # Taggit
-TAGGIT_CASE_INSENSITIVE = True
+# TAGGIT_CASE_INSENSITIVE = True
